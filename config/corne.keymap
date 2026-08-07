@@ -48,9 +48,9 @@
 
         base {
                 bindings = <
-                    &kp TAB  &kp Q  &kp W  &kp E  &kp R  &kp T  &kp Y  &kp U  &kp I  &kp O  &kp P  &kp TAB
+                    &kp TAB  &kp Q  &kp W  &kp E  &kp R  &kp T  &kp Y  &kp U  &kp I  &kp O  &kp P  &kp LS(TAB)
                     &kp LCTRL  &kp A  &kp S  &kp D  &kp F  &kp G  &kp H  &kp J  &kp K  &kp L  &kp BSPC  &kp ESC
-                    &kp LSHFT  &kp Z  &kp X  &kp C  &kp V  &kp B  &kp N  &kp M  &comma_semi_morph  &dot_colon_morph  &minus_under_morph  &trans
+                    &kp LSHFT  &kp Z  &kp X  &kp C  &kp V  &kp B  &kp N  &kp M  &comma_semi_morph  &dot_colon_morph  &minus_under_morph  &kp RSHFT
                     &kp LGUI  &mo LOWER  &kp SPACE  &kp RET  &mo RAISE  &kp RALT
                 >;
             };
