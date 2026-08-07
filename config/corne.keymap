@@ -67,8 +67,8 @@
         raise {
                 bindings = <
                     &trans  &trans  &trans  &kp LBKT  &kp RBKT  &trans  &trans  &trans  &trans  &kp GRAVE  &trans  &trans
-                    &trans  &trans  &trans  &kp LPAR  &kp RPAR  &trans  &trans  &kp QMARK  &kp EXCL  &kp SQT  &kp TILDE  &trans
-                    &trans  &kp LT  &kp GT  &kp LBRC  &kp RBRC  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+                    &trans  &trans  &trans  &kp LPAR  &kp RPAR  &trans  &kp LEFT  &kp DOWN  &kp UP  &kp RIGHT  &kp TILDE  &trans
+                    &trans  &kp LT  &kp GT  &kp LBRC  &kp RBRC  &trans  &trans  &kp QMARK  &kp EXCL  &kp SQT  &trans  &trans
                     &trans  &trans  &trans  &trans  &trans  &trans
                 >;
             };
