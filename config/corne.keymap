@@ -9,9 +9,21 @@
 #define LOWER 1
 #define RAISE 2
 #define ADJUST 3
+#define MODE_2_BASE 4
+#define MODE_2_LOWER 5
+#define MODE_2_RAISE 6
+#define MODE_2_ALTERNATE 7
 
 / {
     behaviors {
+        n_morph_tap_hold: n_morph_tap_hold {
+            compatible = "zmk,behavior-hold-tap";
+            #binding-cells = <2>;
+            flavor = "hold-preferred";
+            tapping-term-ms = <200>;
+            bindings = <&kp>, <&n_morph>;
+        };
+
         dot_colon_morph: dot_colon_morph {
             compatible = "zmk,behavior-mod-morph";
             #binding-cells = <0>;
@@ -32,14 +44,26 @@
             bindings = <&kp COMMA>, <&kp SEMI>;
             mods = <(MOD_LSFT|MOD_RSFT)>;
         };
+
+        n_morph: n_morph {
+            compatible = "zmk,behavior-mod-morph";
+            #binding-cells = <0>;
+            bindings = <&kp N>, <&none>;
+            mods = <(MOD_LSFT|MOD_RSFT)>;
+        };
     };
 
     conditional_layers {
         compatible = "zmk,conditional-layers";
 
-        lower_raise_adjust {
+        lower_raise_adjust_default {
             if-layers = <LOWER RAISE>;
             then-layer = <ADJUST>;
+        };
+
+        lower_raise_adjust_mode_2 {
+            if-layers = <MODE_2_LOWER MODE_2_RAISE>;
+            then-layer = <MODE_2_ALTERNATE>;
         };
     };
 
@@ -50,7 +74,7 @@
                 bindings = <
                     &kp TAB  &kp Q  &kp W  &kp E  &kp R  &kp T  &kp Y  &kp U  &kp I  &kp O  &kp P  &kp LS(TAB)
                     &kp LCTRL  &kp A  &kp S  &kp D  &kp F  &kp G  &kp H  &kp J  &kp K  &kp L  &kp BSPC  &kp ESC
-                    &kp LSHFT  &kp Z  &kp X  &kp C  &kp V  &kp B  &kp N  &kp M  &comma_semi_morph  &dot_colon_morph  &minus_under_morph  &kp RSHFT
+                    &kp LSHFT  &kp Z  &kp X  &kp C  &kp V  &kp B  &n_morph_tap_hold LSHFT 0  &kp M  &comma_semi_morph  &dot_colon_morph  &minus_under_morph  &kp RSHFT
                     &kp LGUI  &mo LOWER  &kp SPACE  &kp RET  &mo RAISE  &kp RALT
                 >;
             };
@@ -76,8 +100,44 @@
         alternate {
                 bindings = <
                     &kp F1  &kp F2  &kp F3  &kp F4  &kp F5  &kp F6  &kp F7  &kp F8  &kp F9  &kp F10  &kp F11  &kp F12
-                    &rgb_ug RGB_TOG  &rgb_ug RGB_HUI  &rgb_ug RGB_BRI  &bt BT_CLR  &bt BT_SEL 0  &bt BT_SEL 1  &trans  &trans  &kp C_PP  &kp C_VOL_UP  &kp C_BRI_UP  &trans
+                    &rgb_ug RGB_TOG  &rgb_ug RGB_HUI  &rgb_ug RGB_BRI  &bt BT_CLR  &bt BT_SEL 0  &bt BT_SEL 1  &to MODE_2_BASE  &to BASE  &kp C_PP  &kp C_VOL_UP  &kp C_BRI_UP  &trans
                     &rgb_ug RGB_EFF  &rgb_ug RGB_HUD  &rgb_ug RGB_BRD  &bt BT_SEL 2  &bt BT_SEL 3  &bt BT_SEL 4  &trans  &trans  &trans  &kp C_VOL_DN  &kp C_BRI_DN  &trans
+                    &trans  &trans  &trans  &trans  &trans  &trans
+                >;
+            };
+
+        mode_2_base {
+                bindings = <
+                    &kp F3  &kp TAB  &kp Q  &trans  &kp E  &kp R  &trans  &trans  &trans  &trans  &trans  &trans
+                    &kp F2  &kp LSHFT  &kp A  &kp W  &kp D  &kp F  &to MODE_2_BASE  &to BASE  &trans  &trans  &trans  &trans
+                    &kp F1  &kp LCTRL  &trans  &kp S  &kp C  &kp V  &trans  &trans  &trans  &trans  &trans  &trans
+                    &mo MODE_2_RAISE  &mo MODE_2_LOWER  &kp SPACE  &trans  &trans  &trans
+                >;
+            };
+
+        mode_2_lower {
+                bindings = <
+                    &trans  &kp N1  &kp N2  &kp N3  &kp N4  &kp N5  &trans  &trans  &trans  &trans  &trans  &trans
+                    &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+                    &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+                    &trans  &trans  &trans  &trans  &trans  &trans
+                >;
+            };
+
+        mode_2_raise {
+                bindings = <
+                    &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+                    &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+                    &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+                    &trans  &trans  &trans  &trans  &trans  &trans
+                >;
+            };
+
+        mode_2_alternate {
+                bindings = <
+                    &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+                    &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+                    &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
                     &trans  &trans  &trans  &trans  &trans  &trans
                 >;
             };
