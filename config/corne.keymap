@@ -93,8 +93,8 @@
 
         mode_2_base {
                 bindings = <
-                    &kp TAB  &trans  &kp Q  &trans  &kp E  &kp R  &trans  &trans  &trans  &trans  &trans  &trans
-                    &kp LCTRL  &kp LSHFT  &kp A  &kp W  &kp D  &kp F  &to MODE_2_BASE  &to BASE  &trans  &trans  &trans  &trans
+                    &trans  &trans  &kp Q  &trans  &kp E  &kp R  &trans  &trans  &trans  &trans  &trans  &trans
+                    &kp LCTRL  &kp LSHFT  &kp A  &kp W  &kp D  &kp F  &trans  &trans  &trans  &trans  &trans  &trans
                     &trans  &trans  &trans  &kp S  &kp C  &kp V  &trans  &trans  &trans  &trans  &trans  &trans
                     &mo MODE_2_RAISE  &mo MODE_2_LOWER  &kp SPACE  &trans  &trans  &trans
                 >;
@@ -102,9 +102,9 @@
 
         mode_2_lower {
                 bindings = <
-                    &trans  &trans  &kp N1  &kp N2  &kp N3  &kp N4  &trans  &trans  &trans  &trans  &trans  &trans
-                    &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
-                    &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+                    &trans  &kp N1  &kp N2  &trans  &kp N3  &kp N4  &kp F9  &kp F10  &kp F11  &kp F1  &trans  &trans
+                    &trans  &trans  &trans  &trans  &trans  &trans  &kp F5  &kp F6  &kp F7  &kp F8  &trans  &trans
+                    &trans  &trans  &trans  &trans  &trans  &trans  &kp F1  &kp F2  &kp F3  &kp F4  &trans  &trans
                     &trans  &trans  &trans  &trans  &trans  &trans
                 >;
             };
@@ -121,7 +121,7 @@
         mode_2_alternate {
                 bindings = <
                     &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
-                    &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+                    &trans  &trans  &trans  &trans  &trans  &trans  &to MODE_2_BASE  &to BASE  &trans  &trans  &trans  &trans
                     &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
                     &trans  &trans  &trans  &trans  &trans  &trans
                 >;
