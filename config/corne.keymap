@@ -66,8 +66,8 @@
 
         lower {
                 bindings = <
-                    &trans  &trans  &kp DQT  &trans  &trans  &trans  &trans  &kp N7  &kp N8  &kp N9  &trans  &trans
-                    &trans  &trans  &trans  &trans  &kp SLASH  &trans  &trans  &kp N4  &kp N5  &kp N6  &trans  &trans
+                    &trans  &trans  &kp AT  &kp HASH  &kp DLLR  &trans  &trans  &kp N7  &kp N8  &kp N9  &trans  &trans
+                    &trans  &kp PIPE  &kp EQUAL  &kp DQT  &kp SLASH  &trans  &trans  &kp N4  &kp N5  &kp N6  &trans  &trans
                     &trans  &trans  &trans  &trans  &trans  &trans  &trans  &kp N1  &kp N2  &kp N3  &kp N0  &trans
                     &trans  &trans  &trans  &trans  &trans  &trans
                 >;
@@ -75,8 +75,8 @@
 
         raise {
                 bindings = <
-                    &trans  &trans  &trans  &kp LBKT  &kp RBKT  &trans  &trans  &trans  &kp EQUAL  &kp GRAVE  &trans  &trans
-                    &trans  &trans  &trans  &kp LPAR  &kp RPAR  &trans  &kp LEFT  &kp DOWN  &kp UP  &kp RIGHT  &kp SQT  &trans
+                    &trans  &trans  &kp CARET  &kp LBKT  &kp RBKT  &trans  &trans  &kp PRCNT  &kp AMPS  &kp GRAVE  &kp BSLH  &trans
+                    &trans  &kp ASTRK  &kp PLUS  &kp LPAR  &kp RPAR  &trans  &kp LEFT  &kp DOWN  &kp UP  &kp RIGHT  &kp SQT  &trans
                     &trans  &kp LT  &kp GT  &kp LBRC  &kp RBRC  &trans  &trans  &kp QMARK  &kp EXCL  &kp TILDE  &trans  &trans
                     &trans  &trans  &trans  &trans  &trans  &trans
                 >;
@@ -96,7 +96,7 @@
                     &trans  &trans  &kp Q  &trans  &kp E  &kp R  &trans  &trans  &trans  &trans  &trans  &trans
                     &kp LCTRL  &kp LSHFT  &kp A  &kp W  &kp D  &kp F  &trans  &trans  &trans  &trans  &trans  &trans
                     &trans  &trans  &trans  &kp S  &kp C  &kp V  &trans  &trans  &trans  &trans  &trans  &trans
-                    &mo MODE_2_RAISE  &mo MODE_2_LOWER  &kp SPACE  &trans  &trans  &trans
+                    &mo MODE_2_RAISE  &mo MODE_2_LOWER  &kp SPACE  &trans  &mo MODE_2_RAISE  &trans
                 >;
             };
 
