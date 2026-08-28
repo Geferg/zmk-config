@@ -405,11 +405,14 @@ static void draw_saturn(void) {
     }
 
     /*
-     * Leave the ring fully occluded by the planet body.  The ring is drawn
-     * before clear_circle(), so only the portions outside the silhouette
-     * remain visible.  This avoids a near-side chord reading as a straight
-     * line across the face at this resolution.
+     * Redraw the near/front half of the ring after the planet body so the
+     * ring passes visibly in front of the lower hemisphere.  The straight
+     * line we removed earlier was the artificial gas-band texture, not this
+     * ring segment.
      */
+    for (size_t i = 1; i <= 12; i++) {
+        line(ring[i - 1][0], ring[i - 1][1], ring[i][0], ring[i][1]);
+    }
 
     /* Slow orbit; animation is intentionally sparse on the central half. */
     static const int8_t moon_dx[8] = {0, 8, 13, 9, 0, -9, -13, -8};
