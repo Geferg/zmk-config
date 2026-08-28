@@ -314,19 +314,13 @@ static void draw_text_centered(int y, const char *text) {
 /* Common HUD pieces                                                           */
 /* -------------------------------------------------------------------------- */
 
-static void draw_battery_bar(uint8_t battery) {
-    /* Ten small segments: lower static OLED wear than a permanent solid bar. */
-    int lit = CLAMP((battery + 9) / 10, 0, 10);
-
-    for (int i = 0; i < 10; i++) {
-        int x = 1 + i * 3;
-        if (i < lit) {
-            fill_rect(x, 122, 2, 3);
-        } else {
-            px(x, 124);
-        }
+static void draw_power_gauge(uint8_t battery) {
+    /* Shared compact battery gauge used identically on both halves. */
+    rect_outline(1, 116, 30, 6);
+    int fill = ((int)CLAMP(battery, 0, 100) * 28 + 50) / 100;
+    if (fill > 0) {
+        fill_rect(2, 117, fill, 4);
     }
-
     line(1, 127, 30, 127);
 }
 
@@ -378,9 +372,8 @@ static void draw_saturn(void) {
     draw_star(28, 53, ((anim_tick / 10) & 1));
 
     /*
-     * One coherent tilted ellipse forms the ring.  Draw the complete ring
-     * first, let the planet occlude it, then redraw only the near/front arc.
-     * This avoids the visible kink where two hand-shaped polylines met.
+     * One coherent tilted ellipse forms the ring. Draw it first, then let the
+     * planet body occlude the center so only the outside portions remain.
      */
     static const int8_t ring[][2] = {
         {31, 30}, {31, 32}, {30, 33}, {28, 35},
@@ -411,10 +404,12 @@ static void draw_saturn(void) {
         }
     }
 
-    /* Near half of the same ellipse, now drawn across the planet. */
-    for (size_t i = 1; i <= 12; i++) {
-        line(ring[i - 1][0], ring[i - 1][1], ring[i][0], ring[i][1]);
-    }
+    /*
+     * Leave the ring fully occluded by the planet body.  The ring is drawn
+     * before clear_circle(), so only the portions outside the silhouette
+     * remain visible.  This avoids a near-side chord reading as a straight
+     * line across the face at this resolution.
+     */
 
     /* Slow orbit; animation is intentionally sparse on the central half. */
     static const int8_t moon_dx[8] = {0, 8, 13, 9, 0, -9, -13, -8};
@@ -436,16 +431,6 @@ static void draw_layer_strip(uint8_t layer) {
             fill_rect(x + 1, 59, 3, 3);
         }
     }
-}
-
-static void draw_power_gauge(uint8_t battery) {
-    /* One compact gauge; the percentage text is deliberately omitted. */
-    rect_outline(1, 116, 30, 6);
-    int fill = ((int)CLAMP(battery, 0, 100) * 28 + 50) / 100;
-    if (fill > 0) {
-        fill_rect(2, 117, fill, 4);
-    }
-    line(1, 127, 30, 127);
 }
 
 static void copy_key_history(char out[RECENT_KEY_COUNT + 1], uint32_t *distance) {
@@ -575,13 +560,13 @@ struct star {
 };
 
 static struct star stars[STAR_COUNT] = {
-    {3, 20, 0},
-    {27, 28, 1},
-    {6, 42, 0},
-    {25, 55, 0},
-    {3, 69, 1},
-    {28, 82, 0},
-    {7, 101, 0},
+    {3, 5, 0},
+    {27, 14, 1},
+    {6, 25, 0},
+    {25, 36, 0},
+    {3, 48, 1},
+    {28, 61, 0},
+    {7, 74, 0},
 };
 
 static uint16_t rng_state = 0x4D2Bu;
@@ -641,8 +626,8 @@ static void update_stars(void) {
     for (int i = 0; i < STAR_COUNT; i++) {
         stars[i].y += step;
 
-        if (stars[i].y > 110) {
-            stars[i].y = 17 + (rng8() % 9);
+        if (stars[i].y > 79) {
+            stars[i].y = 1 + (rng8() % 8);
             stars[i].x = 2 + (rng8() % 28);
             stars[i].kind = (rng8() % 7 == 0) ? 1 : 0;
         }
@@ -651,87 +636,72 @@ static void update_stars(void) {
 
 static void draw_ship(void) {
     /*
-     * Tall outlined craft: intentionally narrow so the star field remains
-     * visible around it on a 32-pixel-wide logical display.
+     * Preserve the full-size craft, but move the scene upward so the lower
+     * telemetry can mirror the left OLED without stealing space from the ship.
      */
-    line(16, 26, 10, 39);
-    line(16, 26, 22, 39);
+    line(16, 6, 10, 19);
+    line(16, 6, 22, 19);
 
-    line(10, 39, 10, 72);
-    line(22, 39, 22, 72);
+    line(10, 19, 10, 52);
+    line(22, 19, 22, 52);
 
-    line(10, 72, 13, 78);
-    line(22, 72, 19, 78);
-    line(13, 78, 19, 78);
+    line(10, 52, 13, 58);
+    line(22, 52, 19, 58);
+    line(13, 58, 19, 58);
 
     /* Window / instrument port. */
-    circle_outline(16, 44, 3);
-    px(16, 44);
+    circle_outline(16, 24, 3);
+    px(16, 24);
 
     /* Hull bands. */
-    line(11, 55, 21, 55);
-    line(11, 65, 21, 65);
+    line(11, 35, 21, 35);
+    line(11, 45, 21, 45);
 
     /* Fins. */
-    line(10, 66, 6, 77);
-    line(6, 77, 11, 74);
-    line(22, 66, 26, 77);
-    line(26, 77, 21, 74);
+    line(10, 46, 6, 57);
+    line(6, 57, 11, 54);
+    line(22, 46, 26, 57);
+    line(26, 57, 21, 54);
 
     /* Engine bell. */
-    line(13, 79, 19, 79);
-    line(14, 80, 18, 80);
+    line(13, 59, 19, 59);
+    line(14, 60, 18, 60);
 
-    /* Exhaust responds to velocity. */
+    /* Exhaust responds to velocity and gets the rest of the scene height. */
     int flame = 3 + MIN(9, velocity / 22);
     int wobble = anim_tick & 1;
 
-    line(15, 81, 14 - wobble, 81 + flame);
-    line(17, 81, 18 + wobble, 81 + flame);
-    line(16, 81, 16, 84 + flame);
+    line(15, 61, 14 - wobble, 61 + flame);
+    line(17, 61, 18 + wobble, 61 + flame);
+    line(16, 61, 16, 64 + flame);
 
     if (velocity > 70) {
-        px(12, 85 + (anim_tick & 3));
-        px(20, 87 + ((anim_tick + 2) & 3));
-    }
-}
-
-static void draw_thrust_meter(void) {
-    int lit = MIN(5, (velocity + 39) / 40);
-
-    draw_text_3x5(1, 101, "THR");
-    for (int i = 0; i < 5; i++) {
-        int x = 15 + i * 3;
-        if (i < lit) {
-            fill_rect(x, 102, 2, 3);
-        } else {
-            px(x, 104);
-        }
+        px(12, 65 + (anim_tick & 3));
+        px(20, 67 + ((anim_tick + 2) & 3));
     }
 }
 
 static void draw_right_hud(void) {
     clear_frame();
 
-    draw_text_centered(1, "VELOCITY");
-
-    char text[8];
-    snprintf(text, sizeof(text), "%03u", (unsigned)MIN(velocity, 999));
-    draw_text_3x5(20, 8, text);
-
-    line(1, 15, 30, 15);
-
+    /* The entire upper region is flight view: no header competing with the ship. */
     for (int i = 0; i < STAR_COUNT; i++) {
         draw_star(stars[i].x, stars[i].y, stars[i].kind);
     }
-
     draw_ship();
-    draw_thrust_meter();
 
-    snprintf(text, sizeof(text), "B %03u%%", (unsigned)hud.battery);
-    draw_text_centered(112, text);
+    /* Mirror the left-side TRAVELED telemetry section. */
+    line(1, 80, 30, 80);
+    draw_text_centered(85, "VELOCITY");
 
-    draw_battery_bar(hud.battery);
+    char text[8];
+    snprintf(text, sizeof(text), "%03u", (unsigned)MIN(velocity, 999));
+    draw_text_centered(93, text);
+    line(1, 102, 30, 102);
+
+    /* Exactly the same POWER section and gauge geometry as the left OLED. */
+    draw_text_centered(107, "POWER");
+    draw_power_gauge(hud.battery);
 
     present_frame_to_oled();
 }
