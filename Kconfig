@@ -1,0 +1,14 @@
+menu "Space OLED HUD"
+
+config SPACE_OLED_HUD
+    bool "Space themed Corne OLED HUD"
+    default n
+    depends on ZMK_DISPLAY
+    select LV_USE_CANVAS
+    select LV_USE_IMG
+    help
+      Custom 32x128 logical HUD for a vertically mounted 128x32 SSD1306.
+      Central/left: typing/gaming mission-control view.
+      Peripheral/right: animated spacecraft and activity-derived velocity.
+
+endmenu
