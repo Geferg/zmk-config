@@ -404,7 +404,7 @@ static void draw_saturn(void) {
             int dx = x - cx;
             int dy = y - cy;
             if (dx * dx + dy * dy < (r - 1) * (r - 1)) {
-                if (((x + y * 2) % 5) == 0 || (y == cy - 3 && (x & 1))) {
+                if (((x + y * 2) % 5) == 0) {
                     px(x, y);
                 }
             }
