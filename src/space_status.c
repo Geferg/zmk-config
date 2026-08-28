@@ -10,7 +10,7 @@
  *   - TYPING / GAMING mode derived from active layer (0..3 / 4..7)
  *   - Saturn-style planet with a small orbiting moon
  *   - four-position sub-layer indicator
- *   - USB / Bluetooth profile + rolling five-key history
+ *   - USB / Bluetooth profile + rolling four-key history
  *   - TRAVELED session key count
  *   - POWER battery gauge
  *
@@ -357,12 +357,12 @@ static inline void present_frame_to_oled(void) {
 
 #if SPACE_IS_CENTRAL
 
-#define RECENT_KEY_COUNT 5
+#define RECENT_KEY_COUNT 4
 #define LEFT_REFRESH_MS 100
 #define LEFT_ANIMATION_TICKS 5
 
 static struct k_spinlock key_history_lock;
-static char recent_keys[RECENT_KEY_COUNT + 1] = "     ";
+static char recent_keys[RECENT_KEY_COUNT + 1] = "    ";
 static uint32_t traveled;
 static atomic_t left_dirty = ATOMIC_INIT(0);
 
@@ -377,13 +377,22 @@ static void draw_saturn(void) {
     draw_star(4, 52, 0);
     draw_star(28, 53, ((anim_tick / 10) & 1));
 
-    /* Back half of Saturn's ring. */
-    static const int ring[][2] = {
-        {1, 42}, {4, 38}, {8, 35}, {13, 32},
-        {19, 30}, {25, 31}, {29, 34}, {31, 37},
+    /*
+     * One coherent tilted ellipse forms the ring.  Draw the complete ring
+     * first, let the planet occlude it, then redraw only the near/front arc.
+     * This avoids the visible kink where two hand-shaped polylines met.
+     */
+    static const int8_t ring[][2] = {
+        {31, 30}, {31, 32}, {30, 33}, {28, 35},
+        {25, 37}, {22, 39}, {18, 40}, {14, 41},
+        {10, 42}, {6, 42},  {4, 42},  {2, 41},
+        {1, 40},  {1, 38},  {2, 37},  {4, 35},
+        {7, 33},  {10, 31}, {14, 30}, {18, 29},
+        {22, 28}, {26, 28}, {28, 28}, {30, 29},
     };
-    for (size_t i = 1; i < ARRAY_SIZE(ring); i++) {
-        line(ring[i - 1][0], ring[i - 1][1], ring[i][0], ring[i][1]);
+    for (size_t i = 0; i < ARRAY_SIZE(ring); i++) {
+        size_t next = (i + 1) % ARRAY_SIZE(ring);
+        line(ring[i][0], ring[i][1], ring[next][0], ring[next][1]);
     }
 
     clear_circle(cx, cy, r);
@@ -402,13 +411,9 @@ static void draw_saturn(void) {
         }
     }
 
-    /* Front half of the ring. */
-    static const int front[][2] = {
-        {1, 42}, {6, 44}, {12, 44}, {18, 42},
-        {24, 39}, {29, 35}, {31, 33},
-    };
-    for (size_t i = 1; i < ARRAY_SIZE(front); i++) {
-        line(front[i - 1][0], front[i - 1][1], front[i][0], front[i][1]);
+    /* Near half of the same ellipse, now drawn across the planet. */
+    for (size_t i = 1; i <= 12; i++) {
+        line(ring[i - 1][0], ring[i - 1][1], ring[i][0], ring[i][1]);
     }
 
     /* Slow orbit; animation is intentionally sparse on the central half. */
@@ -514,7 +519,7 @@ static void draw_left_hud(void) {
     }
     draw_text_3x5(0, 71, connection);
     line(12, 67, 12, 79);
-    draw_text_3x5(13, 71, keys);
+    draw_text_3x5(14, 71, keys);
     line(1, 80, 30, 80);
 
     draw_text_centered(85, "TRAVELED");
@@ -539,7 +544,7 @@ static int key_history_listener_cb(const zmk_event_t *eh) {
 
     char display = keycode_to_recent_char(ev);
 
-    /* Keep the input hot path tiny: update five bytes + a counter, never render. */
+    /* Keep the input hot path tiny: update four bytes + a counter, never render. */
     k_spinlock_key_t key = k_spin_lock(&key_history_lock);
     traveled++;
     if (display != '\0') {
