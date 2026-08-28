@@ -476,6 +476,20 @@ static uint16_t rng_state = 0x4D2Bu;
 static atomic_t activity_pulses = ATOMIC_INIT(0);
 static uint16_t velocity;
 
+/*
+ * The peripheral only sees locally-generated position events.  Treat each
+ * right-half press as a sample of roughly half the keyboard activity, then
+ * feed that estimate into a deliberately inertial velocity model.
+ *
+ * At the 120 ms animation cadence, 96% retention gives a smooth ~3 s time
+ * constant: bursts visibly accelerate the craft, while pauses coast down
+ * instead of dropping the readout immediately.
+ */
+#define VELOCITY_MAX 240u
+#define VELOCITY_PRESS_IMPULSE 6u
+#define VELOCITY_GLOBAL_ESTIMATE 2u
+#define VELOCITY_RETENTION_PERCENT 96u
+
 static uint8_t rng8(void) {
     rng_state = (uint16_t)(rng_state * 109u + 89u);
     return (uint8_t)(rng_state >> 8);
@@ -484,20 +498,22 @@ static uint8_t rng8(void) {
 static void update_velocity(void) {
     atomic_val_t presses = atomic_clear(&activity_pulses);
 
+    /*
+     * Approximate whole-keyboard activity by doubling the locally observed
+     * right-half presses.  Each estimated press adds momentum, then the ship
+     * retains most of that momentum every animation tick.
+     */
     if (presses > 0) {
-        uint16_t target = MIN(199, (int)presses * 48);
+        uint32_t impulse = (uint32_t)presses * VELOCITY_GLOBAL_ESTIMATE *
+                           VELOCITY_PRESS_IMPULSE;
+        velocity = (uint16_t)MIN(VELOCITY_MAX, (uint32_t)velocity + impulse);
+    }
 
-        if (target > velocity) {
-            velocity += MAX(4, (target - velocity + 1) / 2);
-        } else {
-            velocity = (velocity * 3 + target) / 4;
-        }
-    } else {
-        if (velocity > 3) {
-            velocity -= 3;
-        } else {
-            velocity = 0;
-        }
+    velocity = (uint16_t)(((uint32_t)velocity * VELOCITY_RETENTION_PERCENT + 50u) / 100u);
+
+    /* Avoid a long tail of tiny non-zero values after typing stops. */
+    if (velocity < 2) {
+        velocity = 0;
     }
 }
 
