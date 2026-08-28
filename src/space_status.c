@@ -9,9 +9,10 @@
  * Left / central:
  *   - TYPING / GAMING mode derived from active layer (0..3 / 4..7)
  *   - Saturn-style planet with a small orbiting moon
- *   - current sub-layer
- *   - USB / Bluetooth profile
- *   - local battery + segmented battery bar
+ *   - four-position sub-layer indicator
+ *   - USB / Bluetooth profile + rolling five-key history
+ *   - TRAVELED session key count
+ *   - POWER battery gauge
  *
  * Right / peripheral:
  *   - VELOCITY readout
@@ -48,9 +49,12 @@
 #include <zmk/endpoints.h>
 #include <zmk/events/ble_active_profile_changed.h>
 #include <zmk/events/endpoint_changed.h>
+#include <zmk/events/keycode_state_changed.h>
 #include <zmk/events/layer_state_changed.h>
 #include <zmk/events/usb_conn_state_changed.h>
+#include <zmk/hid.h>
 #include <zmk/keymap.h>
+#include <dt-bindings/zmk/modifiers.h>
 #else
 #define SPACE_IS_CENTRAL 0
 #include <zmk/events/position_state_changed.h>
@@ -240,11 +244,37 @@ static uint16_t glyph3x5(char c) {
     case '8': return GLYPH(2, 5, 2, 5, 2);
     case '9': return GLYPH(2, 5, 3, 1, 6);
 
+    case '!': return GLYPH(2, 2, 2, 0, 2);
+    case '@': return GLYPH(7, 5, 7, 4, 3);
+    case '#': return GLYPH(5, 7, 5, 7, 5);
+    case '$': return GLYPH(3, 6, 2, 3, 6);
     case '%': return GLYPH(5, 1, 2, 4, 5);
+    case '^': return GLYPH(2, 5, 0, 0, 0);
+    case '&': return GLYPH(2, 5, 2, 5, 3);
+    case '*': return GLYPH(5, 2, 7, 2, 5);
+    case '(': return GLYPH(2, 4, 4, 4, 2);
+    case ')': return GLYPH(2, 1, 1, 1, 2);
     case '-': return GLYPH(0, 0, 7, 0, 0);
+    case '_': return GLYPH(0, 0, 0, 0, 7);
     case '+': return GLYPH(0, 2, 7, 2, 0);
+    case '=': return GLYPH(0, 7, 0, 7, 0);
+    case '[': return GLYPH(6, 4, 4, 4, 6);
+    case ']': return GLYPH(3, 1, 1, 1, 3);
+    case '{': return GLYPH(3, 2, 6, 2, 3);
+    case '}': return GLYPH(6, 2, 3, 2, 6);
+    case '\\': return GLYPH(4, 4, 2, 1, 1);
+    case '|': return GLYPH(2, 2, 2, 2, 2);
+    case ';': return GLYPH(0, 2, 0, 2, 4);
     case ':': return GLYPH(0, 2, 0, 2, 0);
+    case '\'': return GLYPH(2, 2, 0, 0, 0);
+    case '"': return GLYPH(5, 5, 0, 0, 0);
+    case '`': return GLYPH(4, 2, 0, 0, 0);
+    case '~': return GLYPH(0, 5, 2, 0, 0);
+    case ',': return GLYPH(0, 0, 0, 2, 4);
     case '.': return GLYPH(0, 0, 0, 0, 2);
+    case '<': return GLYPH(1, 2, 4, 2, 1);
+    case '>': return GLYPH(4, 2, 1, 2, 4);
+    case '/': return GLYPH(1, 1, 2, 4, 4);
     case '?': return GLYPH(6, 1, 2, 0, 2);
     case ' ': return 0;
     default:  return GLYPH(7, 1, 2, 0, 2);
@@ -327,48 +357,39 @@ static inline void present_frame_to_oled(void) {
 
 #if SPACE_IS_CENTRAL
 
-static const char *short_layer_name(uint8_t layer) {
-    switch (layer) {
-    case 0: return "BASE";
-    case 1: return "LOWER";
-    case 2: return "RAISE";
-    case 3: return "ADJUST";
-    case 4: return "BASE";
-    case 5: return "LOWER";
-    case 6: return "RAISE";
-    case 7: return "ALT";
-    default: return "OTHER";
-    }
-}
+#define RECENT_KEY_COUNT 5
+#define LEFT_REFRESH_MS 100
+#define LEFT_ANIMATION_TICKS 5
+
+static struct k_spinlock key_history_lock;
+static char recent_keys[RECENT_KEY_COUNT + 1] = "     ";
+static uint32_t traveled;
+static atomic_t left_dirty = ATOMIC_INIT(0);
 
 static void draw_saturn(void) {
     const int cx = 16;
-    const int cy = 38;
-    const int r = 10;
+    const int cy = 35;
+    const int r = 11;
 
-    /* Sparse background stars. */
-    draw_star(4, 20, (anim_tick / 3) & 1);
-    draw_star(27, 25, 0);
-    draw_star(5, 56, 0);
-    draw_star(27, 54, ((anim_tick / 2) & 1));
+    /* Sparse background stars around the larger visual centerpiece. */
+    draw_star(4, 17, (anim_tick / 15) & 1);
+    draw_star(28, 22, 0);
+    draw_star(4, 52, 0);
+    draw_star(28, 53, ((anim_tick / 10) & 1));
 
-    /* Back half of the ring. */
+    /* Back half of Saturn's ring. */
     static const int ring[][2] = {
-        {2, 44}, {5, 40}, {9, 37}, {14, 34},
-        {20, 32}, {25, 33}, {29, 36}, {30, 39},
+        {1, 42}, {4, 38}, {8, 35}, {13, 32},
+        {19, 30}, {25, 31}, {29, 34}, {31, 37},
     };
     for (size_t i = 1; i < ARRAY_SIZE(ring); i++) {
         line(ring[i - 1][0], ring[i - 1][1], ring[i][0], ring[i][1]);
     }
 
-    /*
-     * Erase the ring where the planet body occludes it, then redraw the
-     * planet and the near/front portion of the ring.
-     */
     clear_circle(cx, cy, r);
     circle_outline(cx, cy, r);
 
-    /* Dithered gas bands. */
+    /* Sparse gas-band texture: enough detail to read on the physical OLED. */
     for (int y = cy - r + 2; y <= cy + r - 2; y++) {
         for (int x = cx - r + 2; x <= cx + r - 2; x++) {
             int dx = x - cx;
@@ -381,18 +402,19 @@ static void draw_saturn(void) {
         }
     }
 
-    /* Front ring. */
+    /* Front half of the ring. */
     static const int front[][2] = {
-        {3, 43}, {8, 44}, {14, 43}, {20, 41}, {26, 38}, {30, 36},
+        {1, 42}, {6, 44}, {12, 44}, {18, 42},
+        {24, 39}, {29, 35}, {31, 33},
     };
     for (size_t i = 1; i < ARRAY_SIZE(front); i++) {
         line(front[i - 1][0], front[i - 1][1], front[i][0], front[i][1]);
     }
 
-    /* One small moon orbiting the planet. */
-    static const int8_t moon_dx[8] = {0, 7, 12, 8, 0, -8, -12, -7};
-    static const int8_t moon_dy[8] = {-14, -11, 0, 10, 14, 10, 0, -11};
-    uint8_t frame = (anim_tick / 2) & 7;
+    /* Slow orbit; animation is intentionally sparse on the central half. */
+    static const int8_t moon_dx[8] = {0, 8, 13, 9, 0, -9, -13, -8};
+    static const int8_t moon_dy[8] = {-15, -12, 0, 11, 15, 11, 0, -12};
+    uint8_t frame = (anim_tick / 10) & 7;
     int mx = cx + moon_dx[frame];
     int my = cy + moon_dy[frame];
     px(mx, my);
@@ -403,45 +425,135 @@ static void draw_layer_strip(uint8_t layer) {
     uint8_t local = layer & 0x3;
 
     for (int i = 0; i < 4; i++) {
-        int x = 3 + i * 7;
-        rect_outline(x, 105, 5, 4);
+        int x = 2 + i * 8;
+        rect_outline(x, 58, 5, 5);
         if (i == local) {
-            fill_rect(x + 1, 106, 3, 2);
+            fill_rect(x + 1, 59, 3, 3);
         }
+    }
+}
+
+static void draw_power_gauge(uint8_t battery) {
+    /* One compact gauge; the percentage text is deliberately omitted. */
+    rect_outline(1, 116, 30, 6);
+    int fill = ((int)CLAMP(battery, 0, 100) * 28 + 50) / 100;
+    if (fill > 0) {
+        fill_rect(2, 117, fill, 4);
+    }
+    line(1, 127, 30, 127);
+}
+
+static void copy_key_history(char out[RECENT_KEY_COUNT + 1], uint32_t *distance) {
+    k_spinlock_key_t key = k_spin_lock(&key_history_lock);
+    memcpy(out, recent_keys, sizeof(recent_keys));
+    *distance = traveled;
+    k_spin_unlock(&key_history_lock, key);
+}
+
+static char keycode_to_recent_char(const struct zmk_keycode_state_changed *ev) {
+    uint32_t key = ev->keycode;
+    zmk_mod_flags_t mods = ev->implicit_modifiers | zmk_hid_get_explicit_mods();
+    bool shifted = (mods & (MOD_LSFT | MOD_RSFT)) != 0;
+
+    if (key >= HID_USAGE_KEY_KEYBOARD_A && key <= HID_USAGE_KEY_KEYBOARD_Z) {
+        return (char)('A' + (key - HID_USAGE_KEY_KEYBOARD_A));
+    }
+
+    if (key >= HID_USAGE_KEY_KEYBOARD_1_AND_EXCLAMATION &&
+        key <= HID_USAGE_KEY_KEYBOARD_9_AND_LEFT_PARENTHESIS) {
+        static const char shifted_digits[] = "!@#$%^&*(";
+        int index = (int)(key - HID_USAGE_KEY_KEYBOARD_1_AND_EXCLAMATION);
+        return shifted ? shifted_digits[index] : (char)('1' + index);
+    }
+
+    if (key == HID_USAGE_KEY_KEYBOARD_0_AND_RIGHT_PARENTHESIS) {
+        return shifted ? ')' : '0';
+    }
+
+    switch (key) {
+    case HID_USAGE_KEY_KEYBOARD_SPACEBAR: return '_';
+    case HID_USAGE_KEY_KEYBOARD_RETURN_ENTER: return '>';
+    case HID_USAGE_KEY_KEYBOARD_DELETE_BACKSPACE: return '<';
+    case HID_USAGE_KEY_KEYBOARD_TAB: return '|';
+    case HID_USAGE_KEY_KEYBOARD_ESCAPE: return 'X';
+    case HID_USAGE_KEY_KEYBOARD_MINUS_AND_UNDERSCORE: return shifted ? '_' : '-';
+    case HID_USAGE_KEY_KEYBOARD_EQUAL_AND_PLUS: return shifted ? '+' : '=';
+    case HID_USAGE_KEY_KEYBOARD_LEFT_BRACKET_AND_LEFT_BRACE: return shifted ? '{' : '[';
+    case HID_USAGE_KEY_KEYBOARD_RIGHT_BRACKET_AND_RIGHT_BRACE: return shifted ? '}' : ']';
+    case HID_USAGE_KEY_KEYBOARD_BACKSLASH_AND_PIPE: return shifted ? '|' : '\\';
+    case HID_USAGE_KEY_KEYBOARD_SEMICOLON_AND_COLON: return shifted ? ':' : ';';
+    case HID_USAGE_KEY_KEYBOARD_APOSTROPHE_AND_QUOTE: return shifted ? '"' : '\'';
+    case HID_USAGE_KEY_KEYBOARD_GRAVE_ACCENT_AND_TILDE: return shifted ? '~' : '`';
+    case HID_USAGE_KEY_KEYBOARD_COMMA_AND_LESS_THAN: return shifted ? '<' : ',';
+    case HID_USAGE_KEY_KEYBOARD_PERIOD_AND_GREATER_THAN: return shifted ? '>' : '.';
+    case HID_USAGE_KEY_KEYBOARD_SLASH_AND_QUESTION_MARK: return shifted ? '?' : '/';
+    default: return '\0';
     }
 }
 
 static void draw_left_hud(void) {
     clear_frame();
 
+    char keys[RECENT_KEY_COUNT + 1];
+    uint32_t distance;
+    copy_key_history(keys, &distance);
+
     draw_text_centered(1, hud.layer >= 4 ? "GAMING" : "TYPING");
     line(1, 9, 30, 9);
 
     draw_saturn();
-    line(1, 65, 30, 65);
-
-    char text[12];
-
-    snprintf(text, sizeof(text), "L %s", short_layer_name(hud.layer));
-    draw_text_centered(71, text);
-
-    if (hud.transport == ZMK_TRANSPORT_USB) {
-        strcpy(text, "O USB");
-    } else {
-        snprintf(text, sizeof(text), "O B%u", (unsigned)hud.profile + 1);
-    }
-    draw_text_centered(81, text);
-
-    snprintf(text, sizeof(text), "B %03u%%", (unsigned)hud.battery);
-    draw_text_centered(91, text);
-
     draw_layer_strip(hud.layer);
+    line(1, 66, 30, 66);
 
-    draw_text_3x5(1, 114, "PWR");
-    draw_battery_bar(hud.battery);
+    /* Compact two-column status row: connection | recent logical keys. */
+    char connection[4];
+    if (hud.transport == ZMK_TRANSPORT_USB) {
+        strcpy(connection, "USB");
+    } else {
+        snprintf(connection, sizeof(connection), "BT%u", (unsigned)hud.profile + 1);
+    }
+    draw_text_3x5(0, 71, connection);
+    line(12, 67, 12, 79);
+    draw_text_3x5(13, 71, keys);
+    line(1, 80, 30, 80);
+
+    draw_text_centered(85, "TRAVELED");
+    char text[12];
+    snprintf(text, sizeof(text), "%lu", (unsigned long)MIN(distance, 99999999u));
+    draw_text_centered(93, text);
+    line(1, 102, 30, 102);
+
+    draw_text_centered(107, "POWER");
+    draw_power_gauge(hud.battery);
 
     present_frame_to_oled();
 }
+
+static int key_history_listener_cb(const zmk_event_t *eh) {
+    const struct zmk_keycode_state_changed *ev = as_zmk_keycode_state_changed(eh);
+
+    if (ev == NULL || !ev->state || ev->usage_page != HID_USAGE_KEY ||
+        is_mod(ev->usage_page, ev->keycode)) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+
+    char display = keycode_to_recent_char(ev);
+
+    /* Keep the input hot path tiny: update five bytes + a counter, never render. */
+    k_spinlock_key_t key = k_spin_lock(&key_history_lock);
+    traveled++;
+    if (display != '\0') {
+        memmove(recent_keys, recent_keys + 1, RECENT_KEY_COUNT - 1);
+        recent_keys[RECENT_KEY_COUNT - 1] = display;
+    }
+    k_spin_unlock(&key_history_lock, key);
+
+    atomic_set(&left_dirty, 1);
+    return ZMK_EV_EVENT_BUBBLE;
+}
+
+ZMK_LISTENER(space_key_history, key_history_listener_cb);
+ZMK_SUBSCRIPTION(space_key_history, zmk_keycode_state_changed);
 
 #else
 
@@ -742,7 +854,11 @@ static void animation_timer_cb(lv_timer_t *timer) {
     anim_tick++;
 
 #if SPACE_IS_CENTRAL
-    draw_left_hud();
+    /* Coalesce fast typing bursts into at most one OLED redraw per 100 ms. */
+    bool activity_changed = atomic_clear(&left_dirty) != 0;
+    if (activity_changed || (anim_tick % LEFT_ANIMATION_TICKS) == 0) {
+        draw_left_hud();
+    }
 #else
     update_velocity();
     update_stars();
@@ -770,7 +886,7 @@ lv_obj_t *zmk_display_status_screen(void) {
     space_layer_init();
     space_output_init();
     draw_left_hud();
-    lv_timer_create(animation_timer_cb, 500, NULL);
+    lv_timer_create(animation_timer_cb, LEFT_REFRESH_MS, NULL);
 #else
     draw_right_hud();
     lv_timer_create(animation_timer_cb, 200, NULL);
