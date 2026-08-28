@@ -2,9 +2,9 @@
  * Space OLED HUD - first-pass custom status screen for a vertically mounted
  * 128x32 SSD1306 used with mctechnology17/zmk-nice-oled's `nice_oled` shield.
  *
- * Logical drawing coordinates are 32x128.  The finished logical frame is
- * rotated onto the physical 128x32 display, matching zmk-nice-oled's OLED
- * orientation strategy.
+ * Logical drawing coordinates are 32x128.  Pixel writes are mapped directly
+ * into the physical 128x32 framebuffer.  This preserves the vertical layout
+ * without doing an expensive full-frame LVGL rotation at runtime.
  *
  * Left / central:
  *   - TYPING / GAMING mode derived from active layer (0..3 / 4..7)
@@ -58,7 +58,8 @@
 
 #define LOGICAL_W 32
 #define LOGICAL_H 128
-#define CANVAS_SIDE 128
+#define PHYSICAL_W 128
+#define PHYSICAL_H 32
 
 #define BG_COLOR                                                                                   \
     (IS_ENABLED(CONFIG_NICE_OLED_WIDGET_INVERTED) ? lv_color_black() : lv_color_white())
@@ -77,8 +78,8 @@ struct hud_state {
 static struct hud_state hud;
 
 static lv_obj_t *hud_canvas;
-static lv_color_t canvas_buf[CANVAS_SIDE * CANVAS_SIDE];
-static lv_color_t rotate_buf[CANVAS_SIDE * CANVAS_SIDE];
+/* One physical OLED frame only: 128x32 instead of two 128x128 work buffers. */
+static lv_color_t canvas_buf[PHYSICAL_W * PHYSICAL_H];
 static bool hud_ready;
 static uint32_t anim_tick;
 
@@ -92,7 +93,15 @@ static inline bool in_bounds(int x, int y) {
 
 static inline void set_px_color(int x, int y, lv_color_t color) {
     if (in_bounds(x, y)) {
-        canvas_buf[y * CANVAS_SIDE + x] = color;
+        /*
+         * Equivalent to the old 90-degree LVGL transform:
+         * logical (x, y) -> physical (127 - y, x).
+         * Doing this per plotted pixel is dramatically cheaper than rotating
+         * a 128x128 canvas every animation frame.
+         */
+        int physical_x = (LOGICAL_H - 1) - y;
+        int physical_y = x;
+        canvas_buf[physical_y * PHYSICAL_W + physical_x] = color;
     }
 }
 
@@ -307,23 +316,9 @@ static void draw_star(int x, int y, int kind) {
     }
 }
 
-static void rotate_frame_to_oled(void) {
-    memcpy(rotate_buf, canvas_buf, sizeof(rotate_buf));
-
-    lv_img_dsc_t img;
-    memset(&img, 0, sizeof(img));
-    img.data = (const uint8_t *)rotate_buf;
-    img.header.cf = LV_IMG_CF_TRUE_COLOR;
-    img.header.w = CANVAS_SIDE;
-    img.header.h = CANVAS_SIDE;
-
-    /*
-     * This is the same logical->physical rotation used by zmk-nice-oled:
-     * draw into a 32x128 strip inside a 128x128 canvas, then rotate 90 deg.
-     */
-    lv_canvas_fill_bg(hud_canvas, BG_COLOR, LV_OPA_COVER);
-    lv_canvas_transform(hud_canvas, &img, 900, LV_IMG_ZOOM_NONE, -1, 0,
-                        CANVAS_SIDE / 2, CANVAS_SIDE / 2, false);
+static inline void present_frame_to_oled(void) {
+    /* The framebuffer is already in native 128x32 orientation. */
+    lv_obj_invalidate(hud_canvas);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -445,7 +440,7 @@ static void draw_left_hud(void) {
     draw_text_3x5(1, 114, "PWR");
     draw_battery_bar(hud.battery);
 
-    rotate_frame_to_oled();
+    present_frame_to_oled();
 }
 
 #else
@@ -481,14 +476,14 @@ static uint16_t velocity;
  * right-half press as a sample of roughly half the keyboard activity, then
  * feed that estimate into a deliberately inertial velocity model.
  *
- * At the 120 ms animation cadence, 96% retention gives a smooth ~3 s time
- * constant: bursts visibly accelerate the craft, while pauses coast down
- * instead of dropping the readout immediately.
+ * At the 200 ms animation cadence, 93% retention gives approximately the
+ * same ~3 s decay as the previous 120 ms / 96% version, while cutting OLED
+ * update frequency by one third.
  */
 #define VELOCITY_MAX 240u
 #define VELOCITY_PRESS_IMPULSE 6u
 #define VELOCITY_GLOBAL_ESTIMATE 2u
-#define VELOCITY_RETENTION_PERCENT 96u
+#define VELOCITY_RETENTION_PERCENT 93u
 
 static uint8_t rng8(void) {
     rng_state = (uint16_t)(rng_state * 109u + 89u);
@@ -621,7 +616,7 @@ static void draw_right_hud(void) {
 
     draw_battery_bar(hud.battery);
 
-    rotate_frame_to_oled();
+    present_frame_to_oled();
 }
 
 #endif
@@ -761,15 +756,9 @@ lv_obj_t *zmk_display_status_screen(void) {
     lv_obj_set_style_pad_all(screen, 0, 0);
     lv_obj_set_style_border_width(screen, 0, 0);
 
-    lv_obj_t *clip = lv_obj_create(screen);
-    lv_obj_set_size(clip, CANVAS_SIDE, LOGICAL_W);
-    lv_obj_align(clip, LV_ALIGN_TOP_LEFT, 0, 0);
-    lv_obj_set_style_pad_all(clip, 0, 0);
-    lv_obj_set_style_border_width(clip, 0, 0);
-
-    hud_canvas = lv_canvas_create(clip);
+    hud_canvas = lv_canvas_create(screen);
     lv_obj_align(hud_canvas, LV_ALIGN_TOP_LEFT, 0, 0);
-    lv_canvas_set_buffer(hud_canvas, canvas_buf, CANVAS_SIDE, CANVAS_SIDE,
+    lv_canvas_set_buffer(hud_canvas, canvas_buf, PHYSICAL_W, PHYSICAL_H,
                          LV_IMG_CF_TRUE_COLOR);
 
     hud_ready = true;
@@ -781,10 +770,10 @@ lv_obj_t *zmk_display_status_screen(void) {
     space_layer_init();
     space_output_init();
     draw_left_hud();
-    lv_timer_create(animation_timer_cb, 350, NULL);
+    lv_timer_create(animation_timer_cb, 500, NULL);
 #else
     draw_right_hud();
-    lv_timer_create(animation_timer_cb, 120, NULL);
+    lv_timer_create(animation_timer_cb, 200, NULL);
 #endif
 
     return screen;
