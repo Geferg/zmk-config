@@ -598,23 +598,13 @@ static uint8_t rng8(void) {
 static void update_velocity(void) {
     atomic_val_t presses = atomic_clear(&activity_pulses);
 
-    /*
-     * Approximate whole-keyboard activity by doubling the locally observed
-     * right-half presses.  Each estimated press adds momentum, then the ship
-     * retains most of that momentum every animation tick.
-     */
     if (presses > 0) {
         uint32_t impulse = (uint32_t)presses * VELOCITY_GLOBAL_ESTIMATE *
                            VELOCITY_PRESS_IMPULSE;
         velocity = (uint16_t)MIN(VELOCITY_MAX, (uint32_t)velocity + impulse);
     }
 
-    velocity = (uint16_t)(((uint32_t)velocity * VELOCITY_RETENTION_PERCENT + 50u) / 100u);
-
-    /* Avoid a long tail of tiny non-zero values after typing stops. */
-    if (velocity < 2) {
-        velocity = 0;
-    }
+    velocity = (uint16_t)(((uint32_t)velocity * VELOCITY_RETENTION_PERCENT) / 100u);
 }
 
 static void update_stars(void) {
