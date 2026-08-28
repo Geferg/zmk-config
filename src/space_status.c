@@ -28,6 +28,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <zephyr/kernel.h>
@@ -106,9 +107,9 @@ static void clear_frame(void) {
 }
 
 static void line(int x0, int y0, int x1, int y1) {
-    int dx = ABS(x1 - x0);
+    int dx = abs(x1 - x0);
     int sx = x0 < x1 ? 1 : -1;
-    int dy = -ABS(y1 - y0);
+    int dy = -abs(y1 - y0);
     int sy = y0 < y1 ? 1 : -1;
     int err = dx + dy;
 
