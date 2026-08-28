@@ -518,8 +518,8 @@ static void draw_left_hud(void) {
         snprintf(connection, sizeof(connection), "BT%u", (unsigned)hud.profile + 1);
     }
     draw_text_3x5(0, 71, connection);
-    line(12, 67, 12, 79);
-    draw_text_3x5(14, 71, keys);
+    line(13, 67, 13, 79);
+    draw_text_3x5(16, 71, keys);
     line(1, 80, 30, 80);
 
     draw_text_centered(85, "TRAVELED");
